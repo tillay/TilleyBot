@@ -13,5 +13,3 @@ put user token in
 ~/bot_tokens/tillay8.token
 
 (change in src if you want)
-
-change authorized_user in src to your username to be able to use
