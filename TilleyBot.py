@@ -424,10 +424,26 @@ async def downloader(interaction: discord.Interaction, num: int):
 
 @bot.tree.command(name="bots", description="check active bots")
 async def bots(interaction: discord.Interaction, kill: int = 0):
+    await check_auth(interaction)
     if kill:
-        await interaction.response.send_message(execute_command(f"kill {kill}"))
+        await interaction.response.send_message(execute_command(f"kill {kill}"), ephemeral=True)
     else:
-        await interaction.response.send_message(execute_command("ps aux | grep python3 | head -n -2 | awk '{print $2, $12, $13, $14}'"))
+        await interaction.response.send_message(execute_command("ps aux | grep python3 | head -n -2 | awk '{print $2, $12, $13, $14}'"), ephemeral=True)
+
+@bot.tree.command(name="info", description="display info about the bot")
+async def info(interaction: discord.Interaction):
+    await interaction.response.send_message(
+    "I am tilley bot! FAQ:\n\n"
+    "What do I do?\n"
+    "- I'm a general purpose utility bot\n"
+    "Can everyone use me?\n"
+    "- No. This is a private bot only tilley can use.\n"
+    "- However, source code is [public](<https://github.com/tillay8/TilleyBot>)\n"
+    "Do I violate TOS?\n"
+    "- no comment\n"
+    "Who is my profile picture?\n"
+    "- [anzu](<https://gup.fandom.com/wiki/Anzu_Kadotani>) from girls und panzer\n"
+    )
 
 @bot.event
 async def on_ready():
