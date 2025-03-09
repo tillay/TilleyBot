@@ -1,23 +1,105 @@
-import discord, asyncio, random, os, re, requests, base64
+import discord, asyncio, random, os, re, requests, base64, subprocess, http, json, csv
 from datetime import datetime
 from discord.ext import commands
-from selfbot import send_message, send_file, channel_name_from_id
 from Crypto.Util.Padding import pad, unpad
 from hashlib import sha256
 from Crypto.Cipher import AES
+from html import unescape
+
+authorized_user = "tillay8"
+denied_message = "You are not authorized to use my bot."
+user_gmt_offset = -7
+bot_token_file = "~/bot_tokens/TilleyBot.token"
+user_token_file = "~/bot_tokens/tillay8.token"
+key_file = "/tmp/key"
 
 bot = commands.Bot("prefix", intents=discord.Intents.none())
 
-# Authorized username and message
-AUTHORIZED_USERNAME = "tillay8"
-AUTHORIZED_MESSAGE = "You are not authorized to use this command."
-
-with open(os.path.expanduser("~/bot_tokens/TilleyBot_token"), 'r') as f:
-    token = f.readline().strip()
+def get_bot_token():
+    with open(os.path.expanduser(bot_token_file), 'r') as f:
+        return f.readline().strip()
 
 def get_passwd():
-    with open(os.path.expanduser("./key"), 'r') as f:
+    with open(os.path.expanduser(key_file), 'r') as f:
         return f.readline().strip()
+
+def get_user_token():
+    with open(os.path.expanduser(user_token_file), 'r') as f:
+        return f.readline().strip()
+
+header_data = {
+    "Content-Type": "application/json",
+    "Authorization": get_user_token()
+}
+
+async def check_auth(interaction):
+    if interaction.user.name != authorized_user:
+        await interaction.response.send_message(denied_message, ephemeral=True)
+        return
+
+def send_message(channel_id, message_content):
+    conn = http.client.HTTPSConnection("discord.com", 443)
+    message_data = json.dumps({
+        "content": message_content,
+        "tts": False
+    })
+    conn.request("POST", f"/api/v10/channels/{channel_id}/messages", message_data, header_data)
+    response = conn.getresponse()
+
+def get_most_recent_message(channel_id):
+    conn = http.client.HTTPSConnection("discord.com", 443)
+    conn.request("GET", f"/api/v10/channels/{channel_id}/messages?limit=1", headers=header_data)
+    response = conn.getresponse()
+    if 199 < response.status < 300:
+        message = json.loads(response.read().decode())
+        return message[0]['content'], message[0]['author']['username']
+    else:
+        return f"Discord aint happy: {response.status} error"
+
+def send_file(channel_id, file_path):
+    conn = http.client.HTTPSConnection("discord.com", 443)
+    with open(file_path, 'rb') as file:
+        file_data = file.read()
+    boundary = '----WebKitFormBoundary' + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=16))
+    body = (
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="file"; filename="{os.path.basename(file_path)}"\r\n'
+        'Content-Type: application/octet-stream\r\n\r\n'
+    ).encode('utf-8') + file_data + f'\r\n--{boundary}--\r\n'.encode('utf-8')
+    headers = {
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Authorization": header_data["Authorization"]
+    }
+    conn.request("POST", f"/api/v10/channels/{channel_id}/messages", body, headers)
+    response = conn.getresponse()
+
+def channel_name_from_id(channel_id):
+    conn = http.client.HTTPSConnection("discord.com", 443)
+    conn.request("GET", f"/api/v10/channels/{channel_id}", headers=header_data)
+    response = conn.getresponse()
+    data = response.read().decode('utf-8')
+    if response.status == 200:
+        channel_data = json.loads(data)
+        guild_id = channel_data.get("guild_id")
+        channel_name = channel_data.get("name")
+        conn.request("GET", f"/api/v10/guilds/{guild_id}", headers=header_data)
+        guild_response = conn.getresponse()
+        guild_data = guild_response.read().decode('utf-8')
+        if guild_response.status == 200:
+            guild_info = json.loads(guild_data)
+            guild_name = guild_info.get("name")
+            return [guild_name, channel_name]
+        else:
+            return None
+    else:
+        return None
+
+def get_catgirl_link():
+    url = "https://nekos.moe/api/v1/random/image"
+    response = requests.get(url, params={'nsfw': False})
+    data = response.json()
+    image_id = data['images'][0]['id']
+    return f"https://nekos.moe/image/{image_id}"
 
 def get_user_data(user_id):
     headers = {"Authorization": f"Bot {token}"}
@@ -38,6 +120,21 @@ def get_user_profile_picture(user_id):
         avatar_url = f"https://cdn.discordapp.com/embed/avatars/{default_avatar_index}.png"
     return avatar_url
 
+def translator(inp, to):
+    try:
+        encoded_input = requests.utils.quote(inp.strip())
+        url = f"https://translate.google.com/m?sl=auto&tl={to}&hl=en&q={encoded_input}"
+        response = requests.get(url)
+        match = re.search(r'class="result-container">([^<]*)</div>', response.text)
+        
+        if match:
+            translated_text = match.group(1)
+            return unescape(translated_text)
+        else:
+            return "Translation failed"
+    except Exception as e:
+        return "Translation failed"
+
 def tcrypt(plaintext, passphrase):
     key, iv = sha256((passphrase).encode()).digest(), os.urandom(AES.block_size)
     return base64.b64encode(iv + AES.new(key, AES.MODE_CBC, iv).encrypt(pad(plaintext.encode(), AES.block_size))).decode()
@@ -48,34 +145,26 @@ def tdcrypt(ciphertext, passphrase):
         return unpad(AES.new(sha256((passphrase).encode()).digest(), AES.MODE_CBC, decoded[:AES.block_size]).decrypt(decoded[AES.block_size:]), AES.block_size).decode()
     except (ValueError, KeyError): return None
 
-repeat_tasks = {}
-
 def generate_task_id():
     return random.randint(1000, 9999)
 
+repeat_tasks = {}
+
 @bot.tree.command(name="echo", description="Send a message as tillay8")
 async def echo(interaction: discord.Interaction, tosay: str, channel_id: str = None):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
-    # Use the current channel if no channel_id is provided
+    await check_auth(interaction)
     channel_id = interaction.channel.id if not channel_id else int(channel_id)
     await interaction.response.send_message("Echoing", ephemeral=True)
     send_message(channel_id, tosay)
 
 @bot.tree.command(name="test", description="Is bot alive?")
 async def test(interaction: discord.Interaction):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
+    await check_auth(interaction)
     await interaction.response.send_message(interaction.channel, ephemeral=True)
 
 @bot.tree.command(name="maze", description="Generate maze")
 async def maze(interaction: discord.Interaction, size: int, channel_id: str = None):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
-    # Use the current channel if no channel_id is provided
+    await check_auth(interaction)
     channel_id = interaction.channel.id if not channel_id else int(channel_id)
     await interaction.response.send_message("Generating maze", ephemeral=True)
     send_message(channel_id, f"-maze {size}")
@@ -84,14 +173,12 @@ async def maze(interaction: discord.Interaction, size: int, channel_id: str = No
 
 @bot.tree.command(name="repeat", description="Repeat a message in a channel at a specified interval")
 async def repeat(interaction: discord.Interaction, interval: float, message: str, channel: str = None):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
+    await check_auth(interaction)
     try:
-        channel_id = interaction.channel.id  # Use the current channel if no channel_id is provided
-        task_id = generate_task_id()
+        channel_id = interaction.channel.id
+        task_id = random.randint(1000, 9999)
         while task_id in repeat_tasks:
-            task_id = generate_task_id()
+            task_id = random.randint(1000, 9999)
 
         up_pattern = re.compile(r"<up(\d+)>")
         down_pattern = re.compile(r"<down(\d+)>")
@@ -138,9 +225,7 @@ async def repeat(interaction: discord.Interaction, interval: float, message: str
 
 @bot.tree.command(name="stop-repeat", description="Stop a repeating task by its ID")
 async def stop_repeat(interaction: discord.Interaction, id: int):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
+    await check_auth(interaction)
     try:
         if id in repeat_tasks:
             task, channel_id = repeat_tasks[id]
@@ -156,9 +241,7 @@ async def stop_repeat(interaction: discord.Interaction, id: int):
 
 @bot.tree.command(name="daily-maze", description="Send a daily maze at a specific time")
 async def daily_maze(interaction: discord.Interaction, size: int, hour: int, minute: int, startnum: int):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
+    await check_auth(interaction)
     try:
         channel_id = interaction.channel.id
         task_id = generate_task_id()
@@ -185,36 +268,152 @@ async def daily_maze(interaction: discord.Interaction, size: int, hour: int, min
 
 @bot.tree.command(name="sendpfp", description="Send pfp of a user")
 async def sendpfp(interaction: discord.Interaction, user_id: str):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
+    await check_auth(interaction)
     await interaction.response.send_message(f"Sending {user_id} pfp", ephemeral=True)
     send_message(interaction.channel.id, get_user_profile_picture(user_id))
 
-@bot.tree.command(name="botprint", description="Say something as the bot")
-async def botprint(interaction: discord.Interaction, message: str):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
-    await interaction.response.send_message(message, ephemeral=True)
+@bot.tree.command(name="printas", description="Say something as the bot")
+async def printas(interaction: discord.Interaction, message: str):
+    await check_auth(interaction)
+    await interaction.response.send_message(message)
 
 @bot.tree.command(name="encrypt", description="encrypt a message using server password")
 async def encrypt(interaction: discord.Interaction, message: str):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
+    await check_auth(interaction)
     await interaction.response.send_message(f"&&{tcrypt(message, get_passwd())}", ephemeral=True)
 
 @bot.tree.command(name="decrypt", description="decrypt a message using server password")
 async def decrypt(interaction: discord.Interaction, encrypted: str):
-    if interaction.user.name != AUTHORIZED_USERNAME:
-        await interaction.response.send_message(AUTHORIZED_MESSAGE, ephemeral=True)
-        return
+    await check_auth(interaction)
     await interaction.response.send_message(tdcrypt(encrypted[2:], get_passwd()), ephemeral=True)
+
+@bot.tree.command(name="runcommand", description="Run a command in the terminal and get the output")
+async def runcommand(interaction: discord.Interaction, command: str):
+    await check_auth(interaction)
+    try:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            output = result.stdout
+        else:
+            output = result.stderr        
+        await interaction.response.send_message(f"```ansi\n{output}\n```")
+    except Exception as e:
+        await interaction.response.send_message(f"An error occurred: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="scramble", description="scramble text")
+async def scramble(interaction: discord.Interaction, message: str):
+    await check_auth(interaction)
+    substitutions = [('a', 'а'), ('e', 'е'), ('i', 'і'), ('p', 'р'),
+                     ('s', 'ѕ'), ('c', 'с'), ('o', 'о'), ('x', 'х'),
+                     ('y', 'у')]
+    for old, new in substitutions:
+        message = message.replace(old, new)
+    message = '﻿'.join(list(message))
+    await interaction.response.send_message(message, ephemeral=True)
+
+@bot.tree.command(name="translate", description="translate messages to english")
+async def translate(interaction: discord.Interaction, message: str, lang: str = "en"):
+    await check_auth(interaction)
+    await interaction.response.send_message(translator(message, lang), ephemeral=True)
+        
+@bot.tree.command(name="channelinfo", description="get info from channel id")
+async def channelinfo(interaction: discord.Interaction, id: str):
+    await check_auth(interaction)
+    await interaction.response.send_message(channel_name_from_id(id))
+
+@bot.tree.command(name="catgirl", description="send a catgirl")
+async def catgirl(interaction: discord.Interaction):
+    await check_auth(interaction)
+    await interaction.response.send_message(get_catgirl_link(), ephemeral=True)
+
+def get_timezone_name(offset):
+    gmt_offset_names = [
+        (-12, "International Date Line West (IDLW)"),
+        (-11, "Niue Time (NUT)"),
+        (-10, "Hawaii-Aleutian Time (HAT)"),
+        (-9, "Alaska Time (AKT)"),
+        (-8, "Pacific Time (PT)"),
+        (-7, "Mountain Time (MT)"),
+        (-6, "Central Time (CT)"),
+        (-5, "Eastern Time (ET)"),
+        (-4, "Atlantic Time (AT)"),
+        (-3, "Argentina Time (ART)"),
+        (-2, "South Georgia Time (SGT)"),
+        (-1, "Azores Time (AZOT)"),
+        (0, "Greenwich Mean Time (GMT)"),
+        (1, "Central European Time (CET)"),
+        (2, "Eastern European Time (EET)"),
+        (3, "Moscow Time (MSK)"),
+        (4, "Gulf Standard Time (GST)"),
+        (5, "Pakistan Standard Time (PKT)"),
+        (6, "Bangladesh Time (BST)"),
+        (7, "Indochina Time (ICT)"),
+        (8, "China Standard Time (CST)"),
+        (9, "Japan Standard Time (JST)"),
+        (10, "Australian Eastern Time (AET)"),
+        (11, "Solomon Islands Time (SBT)"),
+        (12, "New Zealand Standard Time (NZST)")
+    ]
+    for gmt_offset, name in gmt_offset_names:
+        if gmt_offset == offset:
+            return name
+
+@bot.tree.command(name="timezones", description="calculate timezones")
+async def timezones(interaction: discord.Interaction, their_time: int = None, your_time: int = None, offset: int = None):
+    await check_auth(interaction)
+    now = datetime.now()
+    if your_time and their_time:
+        offset = (their_time - your_time) % 24
+        if offset > 12:
+            offset -= 24
+        await interaction.response.send_message(f"GMT{"+" if offset + user_gmt_offset > 0 else ""}{offset + user_gmt_offset}, MDT{"+" if offset > 0 else ""}{offset}, {get_timezone_name((offset + user_gmt_offset) % 12)}", ephemeral=True)
+    elif their_time and offset:
+        your_time = (their_time - offset) % 24
+        await interaction.response.send_message(f"Your time is: {your_time}", ephemeral=True)
+    elif offset:
+        their_hour = (now.hour + offset) % 24
+        await interaction.response.send_message(f"Their time is: {their_hour}:{"0" if len(str(now.minute)) == 1 else ""}{now.minute}", ephemeral=True)
+    else:
+        await interaction.response.send_message("http://www.hoelaatishetnuprecies.nl/wp-content/uploads/2015/03/world-timezone-large.jpg")
+
+@bot.tree.command(name="downloader", description="download messages")
+async def downloader(interaction: discord.Interaction, num: int):
+    await check_auth(interaction)
+    filename = "messages.txt"
+    channel_id = interaction.channel.id
+    total_messages_to_fetch = num
+    messages_fetched = 0
+    before_id = None
+    await interaction.response.send_message(f"Downloading {num} messages from {interaction.channel.name}", ephemeral=True)
+    with open(filename, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        while messages_fetched < total_messages_to_fetch:
+            remaining_messages = total_messages_to_fetch - messages_fetched
+            current_batch_size = min(100, remaining_messages)
+            url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
+            params = {"limit": current_batch_size}
+            if before_id:
+                params["before"] = before_id
+            response = requests.get(url, headers=header_data, params=params)
+            if response.status_code == 200:
+                messages = response.json()
+                if messages:
+                    for message in messages:
+                        writer.writerow([message['content']])
+                    messages_fetched += len(messages)
+                    before_id = messages[-1]["id"]
+                else:
+                    break
+            else:
+                break
+    with open(filename, mode='r', encoding='utf-8') as file:
+        lines = file.readlines()
+    with open(filename, mode='w', encoding='utf-8') as file:
+        file.writelines(reversed(lines))
+    await interaction.followup.send(file=discord.File(filename), ephemeral=True)
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
     print("Ready!")
-
-bot.run(token)
+bot.run(get_bot_token())
