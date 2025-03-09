@@ -401,7 +401,7 @@ async def downloader(interaction: discord.Interaction, num: int):
     total_messages_to_fetch = num
     messages_fetched = 0
     before_id = None
-    await interaction.response.send_message(f"Downloading {num} messages from {interaction.channel.name}", ephemeral=True)
+    await interaction.response.send_message(f"Downloading {num} messages from {interaction.channel.id}", ephemeral=True)
     with open(filename, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         while messages_fetched < total_messages_to_fetch:
