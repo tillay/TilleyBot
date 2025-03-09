@@ -1,10 +1,14 @@
 import discord, asyncio, random, os, re, requests, base64, subprocess, http, json, csv
 from datetime import datetime
 from discord.ext import commands
-from Crypto.Util.Padding import pad, unpad
 from hashlib import sha256
-from Crypto.Cipher import AES
 from html import unescape
+try:
+    from Cryptodome.Util.Padding import pad, unpad
+    from Cryptodome.Cipher import AES
+except ModuleNotFoundError:
+    from Crypto.Util.Padding import pad, unpad
+    from Crypto.Cipher import AES
 
 authorized_user = "tillay8"
 denied_message = "You are not authorized to use my bot."
@@ -382,7 +386,10 @@ async def timezones(interaction: discord.Interaction, their_time: int = None, yo
         await interaction.response.send_message(f"Your time is: {your_time}", ephemeral=True)
     elif offset:
         their_hour = (now.hour + offset - user_gmt_offset) % 24
-        await interaction.response.send_message(f"Their time is: {their_hour}:{"0" if len(str(now.minute)) == 1 else ""}{now.minute}", ephemeral=True)
+        await interaction.response.send_message(
+            f"Their time is: {their_hour}:{'0' if len(str(now.minute)) == 1 else ''}{now.minute}",
+            ephemeral=True
+        )
     else:
         await interaction.response.send_message("http://www.hoelaatishetnuprecies.nl/wp-content/uploads/2015/03/world-timezone-large.jpg")
 
@@ -449,4 +456,5 @@ async def info(interaction: discord.Interaction):
 async def on_ready():
     await bot.tree.sync()
     print(f"connected to {bot.user}")
+    
 bot.run(get_bot_token())
