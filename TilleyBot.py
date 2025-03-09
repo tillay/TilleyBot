@@ -13,7 +13,7 @@ bot_token_file = "~/bot_tokens/TilleyBot.token"
 user_token_file = "~/bot_tokens/tillay8.token"
 key_file = "/tmp/key"
 
-bot = commands.Bot("prefix", intents=discord.Intents.none())
+bot = commands.Bot("!", intents=discord.Intents.none())
 
 def get_bot_token():
     with open(os.path.expanduser(bot_token_file), 'r') as f:
@@ -144,6 +144,17 @@ def tdcrypt(ciphertext, passphrase):
         decoded = base64.b64decode(ciphertext)
         return unpad(AES.new(sha256((passphrase).encode()).digest(), AES.MODE_CBC, decoded[:AES.block_size]).decrypt(decoded[AES.block_size:]), AES.block_size).decode()
     except (ValueError, KeyError): return None
+
+def execute_command(cmd):
+    try:
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            output = result.stdout
+        else:
+            output = result.stderr
+        return f"```ansi\n{output}\n```"
+    except Exception as e:
+        return f"An error occurred: {str(e)}"
 
 def generate_task_id():
     return random.randint(1000, 9999)
@@ -290,15 +301,7 @@ async def decrypt(interaction: discord.Interaction, encrypted: str):
 @bot.tree.command(name="runcommand", description="Run a command in the terminal and get the output")
 async def runcommand(interaction: discord.Interaction, command: str):
     await check_auth(interaction)
-    try:
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        if result.returncode == 0:
-            output = result.stdout
-        else:
-            output = result.stderr        
-        await interaction.response.send_message(f"```ansi\n{output}\n```")
-    except Exception as e:
-        await interaction.response.send_message(f"An error occurred: {str(e)}", ephemeral=True)
+    await interaction.response.send_message(execute_command(command), ephemeral=True)
 
 @bot.tree.command(name="scramble", description="scramble text")
 async def scramble(interaction: discord.Interaction, message: str):
@@ -366,12 +369,19 @@ async def timezones(interaction: discord.Interaction, their_time: int = None, yo
         offset = (their_time - your_time) % 24
         if offset > 12:
             offset -= 24
-        await interaction.response.send_message(f"GMT{"+" if offset + user_gmt_offset > 0 else ""}{offset + user_gmt_offset}, MDT{"+" if offset > 0 else ""}{offset}, {get_timezone_name((offset + user_gmt_offset) % 12)}", ephemeral=True)
+        offset_total = offset + user_gmt_offset
+        gmt_sign = "+" if offset_total > 0 else ""
+        mdt_sign = "+" if offset > 0 else ""
+        timezone_name = get_timezone_name(offset_total % 12)
+        await interaction.response.send_message(
+            f"GMT{gmt_sign}{offset_total}, MDT{mdt_sign}{offset}, {timezone_name}",
+            ephemeral=True
+        )
     elif their_time and offset:
         your_time = (their_time - offset) % 24
         await interaction.response.send_message(f"Your time is: {your_time}", ephemeral=True)
     elif offset:
-        their_hour = (now.hour + offset) % 24
+        their_hour = (now.hour + offset - user_gmt_offset) % 24
         await interaction.response.send_message(f"Their time is: {their_hour}:{"0" if len(str(now.minute)) == 1 else ""}{now.minute}", ephemeral=True)
     else:
         await interaction.response.send_message("http://www.hoelaatishetnuprecies.nl/wp-content/uploads/2015/03/world-timezone-large.jpg")
@@ -412,8 +422,15 @@ async def downloader(interaction: discord.Interaction, num: int):
         file.writelines(reversed(lines))
     await interaction.followup.send(file=discord.File(filename), ephemeral=True)
 
+@bot.tree.command(name="bots", description="check active bots")
+async def bots(interaction: discord.Interaction, kill: int = 0):
+    if kill:
+        await interaction.response.send_message(execute_command(f"kill {kill}"))
+    else:
+        await interaction.response.send_message(execute_command("ps aux | grep python3 | head -n -2 | awk '{print $2, $12, $13, $14}'"))
+
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print("Ready!")
+    print(f"connected to {bot.user}")
 bot.run(get_bot_token())
