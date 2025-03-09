@@ -10,8 +10,6 @@ except ModuleNotFoundError:
     from Crypto.Util.Padding import pad, unpad
     from Crypto.Cipher import AES
 
-authorized_user = "tillay8"
-denied_message = "You are not authorized to use my bot."
 user_gmt_offset = -7
 bot_token_file = "~/bot_tokens/TilleyBot.token"
 user_token_file = "~/bot_tokens/tillay8.token"
@@ -35,11 +33,6 @@ header_data = {
     "Content-Type": "application/json",
     "Authorization": get_user_token()
 }
-
-async def check_auth(interaction):
-    if interaction.user.name != authorized_user:
-        await interaction.response.send_message(denied_message, ephemeral=True)
-        return
 
 def send_message(channel_id, message_content):
     conn = http.client.HTTPSConnection("discord.com", 443)
@@ -167,19 +160,16 @@ repeat_tasks = {}
 
 @bot.tree.command(name="echo", description="Send a message as tillay8")
 async def echo(interaction: discord.Interaction, tosay: str, channel_id: str = None):
-    await check_auth(interaction)
     channel_id = interaction.channel.id if not channel_id else int(channel_id)
     await interaction.response.send_message("Echoing", ephemeral=True)
     send_message(channel_id, tosay)
 
 @bot.tree.command(name="test", description="Is bot alive?")
 async def test(interaction: discord.Interaction):
-    await check_auth(interaction)
     await interaction.response.send_message(interaction.channel, ephemeral=True)
 
 @bot.tree.command(name="maze", description="Generate maze")
 async def maze(interaction: discord.Interaction, size: int, channel_id: str = None):
-    await check_auth(interaction)
     channel_id = interaction.channel.id if not channel_id else int(channel_id)
     await interaction.response.send_message("Generating maze", ephemeral=True)
     send_message(channel_id, f"-maze {size}")
@@ -188,7 +178,6 @@ async def maze(interaction: discord.Interaction, size: int, channel_id: str = No
 
 @bot.tree.command(name="repeat", description="Repeat a message in a channel at a specified interval")
 async def repeat(interaction: discord.Interaction, interval: float, message: str, channel: str = None):
-    await check_auth(interaction)
     try:
         channel_id = interaction.channel.id
         task_id = random.randint(1000, 9999)
@@ -239,7 +228,6 @@ async def repeat(interaction: discord.Interaction, interval: float, message: str
 
 @bot.tree.command(name="stop-repeat", description="Stop a repeating task by its ID")
 async def stop_repeat(interaction: discord.Interaction, id: int):
-    await check_auth(interaction)
     try:
         if id in repeat_tasks:
             task, channel_id = repeat_tasks[id]
@@ -254,7 +242,6 @@ async def stop_repeat(interaction: discord.Interaction, id: int):
 
 @bot.tree.command(name="daily-maze", description="Send a daily maze at a specific time")
 async def daily_maze(interaction: discord.Interaction, size: int, hour: int, minute: int, startnum: int):
-    await check_auth(interaction)
     try:
         channel_id = interaction.channel.id
         task_id = generate_task_id()
@@ -280,33 +267,27 @@ async def daily_maze(interaction: discord.Interaction, size: int, hour: int, min
 
 @bot.tree.command(name="sendpfp", description="Send pfp of a user")
 async def sendpfp(interaction: discord.Interaction, user_id: str):
-    await check_auth(interaction)
     await interaction.response.send_message(f"Sending {user_id} pfp", ephemeral=True)
     send_message(interaction.channel.id, get_user_profile_picture(user_id))
 
 @bot.tree.command(name="printas", description="Say something as the bot")
 async def printas(interaction: discord.Interaction, message: str):
-    await check_auth(interaction)
     await interaction.response.send_message(message)
 
 @bot.tree.command(name="encrypt", description="encrypt a message using server password")
 async def encrypt(interaction: discord.Interaction, message: str):
-    await check_auth(interaction)
     await interaction.response.send_message(f"&&{tcrypt(message, get_passwd())}", ephemeral=True)
 
 @bot.tree.command(name="decrypt", description="decrypt a message using server password")
 async def decrypt(interaction: discord.Interaction, encrypted: str):
-    await check_auth(interaction)
     await interaction.response.send_message(tdcrypt(encrypted[2:], get_passwd()), ephemeral=True)
 
 @bot.tree.command(name="runcommand", description="Run a command in the terminal and get the output")
 async def runcommand(interaction: discord.Interaction, command: str):
-    await check_auth(interaction)
     await interaction.response.send_message(execute_command(command), ephemeral=True)
 
 @bot.tree.command(name="scramble", description="scramble text")
 async def scramble(interaction: discord.Interaction, message: str):
-    await check_auth(interaction)
     substitutions = [('a', 'а'), ('e', 'е'), ('i', 'і'), ('p', 'р'),
                      ('s', 'ѕ'), ('c', 'с'), ('o', 'о'), ('x', 'х'),
                      ('y', 'у')]
@@ -317,17 +298,14 @@ async def scramble(interaction: discord.Interaction, message: str):
 
 @bot.tree.command(name="translate", description="translate messages to english")
 async def translate(interaction: discord.Interaction, message: str, lang: str = "en"):
-    await check_auth(interaction)
     await interaction.response.send_message(translator(message, lang), ephemeral=True)
         
 @bot.tree.command(name="channelinfo", description="get info from channel id")
 async def channelinfo(interaction: discord.Interaction, id: str):
-    await check_auth(interaction)
     await interaction.response.send_message(channel_name_from_id(id))
 
 @bot.tree.command(name="catgirl", description="send a catgirl")
 async def catgirl(interaction: discord.Interaction):
-    await check_auth(interaction)
     await interaction.response.send_message(get_catgirl_link(), ephemeral=True)
 
 def get_timezone_name(offset):
@@ -364,7 +342,6 @@ def get_timezone_name(offset):
 
 @bot.tree.command(name="timezones", description="calculate timezones")
 async def timezones(interaction: discord.Interaction, their_time: int = None, your_time: int = None, offset: int = None):
-    await check_auth(interaction)
     now = datetime.now()
     if your_time and their_time:
         offset = (their_time - your_time) % 24
@@ -392,7 +369,6 @@ async def timezones(interaction: discord.Interaction, their_time: int = None, yo
 
 @bot.tree.command(name="downloader", description="download messages")
 async def downloader(interaction: discord.Interaction, num: int):
-    await check_auth(interaction)
     filename = "messages.txt"
     channel_id = interaction.channel.id
     total_messages_to_fetch = num
@@ -428,7 +404,6 @@ async def downloader(interaction: discord.Interaction, num: int):
 
 @bot.tree.command(name="bots", description="check active bots")
 async def bots(interaction: discord.Interaction, kill: int = 0):
-    await check_auth(interaction)
     if kill:
         await interaction.response.send_message(execute_command(f"kill {kill}"), ephemeral=True)
     else:
