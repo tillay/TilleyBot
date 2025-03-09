@@ -233,7 +233,6 @@ async def repeat(interaction: discord.Interaction, interval: float, message: str
         repeat_tasks[task_id] = (task, channel_id)
 
         await interaction.response.send_message(f"Started repeat: {task_id}", ephemeral=True)
-        await interaction.followup.send(f"Channel: {interaction.channel.name}", ephemeral=True)
 
     except Exception as e:
         await interaction.response.send_message(f"Failed to start repeating task: {e}", ephemeral=True)
@@ -248,7 +247,6 @@ async def stop_repeat(interaction: discord.Interaction, id: int):
             del repeat_tasks[id]
 
             await interaction.response.send_message(f"Stopped repeating task with ID: {id}", ephemeral=True)
-            await interaction.followup.send(f"Channel: {interaction.channel.name}", ephemeral=True)
         else:
             await interaction.response.send_message(f"No repeating task found with ID: {id}", ephemeral=True)
     except Exception as e:
@@ -277,7 +275,6 @@ async def daily_maze(interaction: discord.Interaction, size: int, hour: int, min
         task = asyncio.create_task(repeat_task())
         repeat_tasks[task_id] = (task, channel_id)
         await interaction.response.send_message(f"Started daily maze: {task_id}", ephemeral=True)
-        await interaction.followup.send(f"Channel: {interaction.channel.name}", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"Failed to start daily maze: {e}", ephemeral=True)
 
