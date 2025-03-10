@@ -428,7 +428,7 @@ async def info(interaction: discord.Interaction):
 async def password(interaction: discord.Interaction, password: str):
     with open(os.path.expanduser(key_file), 'w') as f:
         f.write(password)
-    await interaction.response.send_message("password set!")
+    await interaction.response.send_message("password set!", ephemeral=True)
             
 @bot.event
 async def on_ready():
