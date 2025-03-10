@@ -423,7 +423,13 @@ async def info(interaction: discord.Interaction):
     "Who is my profile picture?\n"
     "- [anzu](<https://gup.fandom.com/wiki/Anzu_Kadotani>) from girls und panzer\n"
     )
-
+    
+@bot.tree.command(name="password", description="set password for encryption")
+async def password(interaction: discord.Interaction, password: str):
+    with open(os.path.expanduser(key_file), 'w') as f:
+        f.write(password)
+    await interaction.response.send_message("password set!")
+            
 @bot.event
 async def on_ready():
     await bot.tree.sync()
