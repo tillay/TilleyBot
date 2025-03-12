@@ -290,7 +290,7 @@ async def runcommand(interaction: discord.Interaction, command: str):
 async def scramble(interaction: discord.Interaction, message: str):
     substitutions = [('a', 'а'), ('e', 'е'), ('i', 'і'), ('p', 'р'),
                      ('s', 'ѕ'), ('c', 'с'), ('o', 'о'), ('x', 'х'),
-                     ('y', 'у'), ('.', '․')]
+                     ('y', 'у')]
     for old, new in substitutions:
         message = message.replace(old, new)
     message = '﻿'.join(list(message))
