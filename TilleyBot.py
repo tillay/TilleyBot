@@ -98,25 +98,6 @@ def get_catgirl_link():
     image_id = data['images'][0]['id']
     return f"https://nekos.moe/image/{image_id}"
 
-def get_user_data(user_id):
-    headers = {"Authorization": f"Bot {token}"}
-    response = requests.get(f"https://discord.com/api/v10/users/{user_id}", headers=headers)
-    if response.status_code != 200:
-        raise Exception(f"User with that id does not exist")
-    return response.json()
-
-def get_user_profile_picture(user_id):
-    user_data = get_user_data(user_id)
-    if user_data.get("avatar"):
-        if user_data["avatar"].startswith("a_"):
-            avatar_url = f"https://cdn.discordapp.com/avatars/{user_id}/{user_data['avatar']}.gif?size={512}"
-        else:
-            avatar_url = f"https://cdn.discordapp.com/avatars/{user_id}/{user_data['avatar']}.png?size={512}"
-    else:
-        default_avatar_index = int(user_data.get("discriminator", 0)) % 5
-        avatar_url = f"https://cdn.discordapp.com/embed/avatars/{default_avatar_index}.png"
-    return avatar_url
-
 def translator(inp, to):
     try:
         encoded_input = requests.utils.quote(inp.strip())
@@ -265,10 +246,14 @@ async def daily_maze(interaction: discord.Interaction, size: int, hour: int, min
     except Exception as e:
         await interaction.response.send_message(f"Failed to start daily maze: {e}", ephemeral=True)
 
-@bot.tree.command(name="sendpfp", description="Send pfp of a user")
-async def sendpfp(interaction: discord.Interaction, user_id: str):
-    await interaction.response.send_message(f"Sending {user_id} pfp", ephemeral=True)
-    send_message(interaction.channel.id, get_user_profile_picture(user_id))
+@bot.tree.command(name="pfp", description="Send pfp of a user")
+async def pfp(interaction: discord.Interaction, user: str):
+    try:
+        member = await bot.fetch_user(int(user))
+    except discord.NotFound:
+        await interaction.response.send_message("User not found.", ephemeral=True)
+        return
+    await interaction.response.send_message(member.display_avatar.url, ephemeral=True)
 
 @bot.tree.command(name="printas", description="Say something as the bot")
 async def printas(interaction: discord.Interaction, message: str):
@@ -306,7 +291,11 @@ async def channelinfo(interaction: discord.Interaction, id: str):
 
 @bot.tree.command(name="catgirl", description="send a catgirl")
 async def catgirl(interaction: discord.Interaction):
-    await interaction.response.send_message(get_catgirl_link(), ephemeral=True)
+    await interaction.response.send_message(get_catgirl_link(), ephemeral=False)
+
+@bot.tree.command(name="diddy", description="generate a diddy")
+async def diddy(interaction: discord.Interaction):
+    await interaction.response.send_message("https://www.lafocusnews.com/wp-content/uploads/2023/08/Diddy-681x1024.jpg", ephemeral=False)
 
 def get_timezone_name(offset):
     gmt_offset_names = [
@@ -429,7 +418,29 @@ async def password(interaction: discord.Interaction, password: str):
     with open(os.path.expanduser(key_file), 'w') as f:
         f.write(password)
     await interaction.response.send_message("password set!", ephemeral=True)
-            
+
+@bot.tree.command(name="date", description="make fancy date embed")
+async def date(interaction: discord.Interaction, month: int = None, day: int = None, hour: int = None, minute: int = None):
+    now = datetime.now()
+    target_month = month if month is not None else now.month
+    target_day = day if day is not None else now.day
+    target_hour = hour if hour is not None else now.hour
+    target_minute = minute if minute is not None else now.minute
+    try:
+        target_date = datetime(now.year, target_month, target_day, target_hour, target_minute)
+        unix_time = int(target_date.timestamp())
+        fancy_date = f"<t:{unix_time}:F>"
+        await interaction.response.send_message(f"{fancy_date}```{fancy_date}```", ephemeral=True)
+    except ValueError:
+        await interaction.response.send_message("invalid data", ephemeral=True)
+
+@bot.tree.command(name="hidetext", description="hide text behind other text")
+async def hidetext(interaction: discord.Interaction, showntext: str, hidetext: str):
+    spoiler = "||​" * 400
+    await interaction.response.send_message(
+        f"```{showntext}  {spoiler} _ _ _ _ _ _  {hidetext}```",
+        ephemeral=True
+    )
 @bot.event
 async def on_ready():
     await bot.tree.sync()
