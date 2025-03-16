@@ -1,20 +1,18 @@
-import discord, asyncio, random, os, re, requests, base64, subprocess, http, json, csv
+import discord, asyncio, random, os, re, requests, base64, subprocess, http, json, csv, time
 from datetime import datetime
 from discord.ext import commands
 from hashlib import sha256
 from html import unescape
+from openai import OpenAI
+
 try:
     from Cryptodome.Util.Padding import pad, unpad
     from Cryptodome.Cipher import AES
 except ModuleNotFoundError:
     from Crypto.Util.Padding import pad, unpad
     from Crypto.Cipher import AES
-try:
-    from openai import OpenAI
-except ModuleNotFoundError:
-    print("Warning: AI integration will not work")
 
-user_gmt_offset = -7
+user_gmt_offset = -6
 bot_token_file = "~/bot_tokens/TilleyBot.token"
 user_token_file = "~/bot_tokens/tillay8.token"
 ai_token_file = "~/bot_tokens/deepseek.token"
@@ -54,6 +52,21 @@ def send_user_message(channel_id, message_content):
     })
     conn.request("POST", f"/api/v10/channels/{channel_id}/messages", message_data, header_data)
     response = conn.getresponse()
+    if response.status == 200:
+        message_info = json.loads(response.read().decode())
+        return message_info['id']
+    else:
+        print(f"Failed to send message: {response.status} {response.reason}")
+        return None
+
+
+def send_and_delete(channel_id, message_content, delay = 0):
+    message_id = send_user_message(channel_id, message_content)
+    if delay: time.sleep(delay)
+    if message_id:
+        delete_url = f"https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}"
+        requests.delete(delete_url, headers=header_data)
+
 def deepseek_query(prompt, context):
     client = OpenAI(api_key=get_ai_token(), base_url="https://api.deepseek.com")
     response = client.chat.completions.create(
@@ -91,7 +104,6 @@ def send_file(channel_id, file_path):
         "Authorization": header_data["Authorization"]
     }
     conn.request("POST", f"/api/v10/channels/{channel_id}/messages", body, headers)
-    response = conn.getresponse()
 
 def channel_name_from_id(channel_id):
     conn = http.client.HTTPSConnection("discord.com", 443)
@@ -469,6 +481,12 @@ async def ai_tilley(interaction: discord.Interaction):
 async def deepseek(interaction: discord.Interaction, prompt: str):
     await interaction.response.send_message(prompt)
     await interaction.followup.send(deepseek_query(prompt, "You are a discord bot called Tilley Bot who answers questions in a discord server. do not include emojis and be relatively serious"))
+
+@bot.tree.command(name="ghost_ping", description="send and delete message fast")
+async def ghost_ping(interaction: discord.Interaction, message: str, sniper: str=None, delay: int = None):
+    await interaction.response.send_message("you should feel guilty", ephemeral=True)
+    send_and_delete(interaction.channel.id, message, delay)
+    if sniper: send_and_delete(interaction.channel.id, sniper)
 
 @bot.event
 async def on_ready():
