@@ -9,10 +9,16 @@ try:
 except ModuleNotFoundError:
     from Crypto.Util.Padding import pad, unpad
     from Crypto.Cipher import AES
+try:
+    from openai import OpenAI
+except ModuleNotFoundError:
+    print("Warning: AI integration will not work")
 
 user_gmt_offset = -7
 bot_token_file = "~/bot_tokens/TilleyBot.token"
 user_token_file = "~/bot_tokens/tillay8.token"
+ai_token_file = "~/bot_tokens/deepseek.token"
+
 key_file = "/tmp/key"
 
 bot = commands.Bot("!", intents=discord.Intents.none())
@@ -29,12 +35,18 @@ def get_user_token():
     with open(os.path.expanduser(user_token_file), 'r') as f:
         return f.readline().strip()
 
+def get_ai_token():
+    with open(os.path.expanduser(ai_token_file), 'r') as f:
+        return f.readline().strip()
+
 header_data = {
     "Content-Type": "application/json",
     "Authorization": get_user_token()
 }
 
-def send_message(channel_id, message_content):
+client = OpenAI(api_key=get_ai_token(), base_url="https://api.deepseek.com")
+
+def send_user_message(channel_id, message_content):
     conn = http.client.HTTPSConnection("discord.com", 443)
     message_data = json.dumps({
         "content": message_content,
@@ -42,6 +54,17 @@ def send_message(channel_id, message_content):
     })
     conn.request("POST", f"/api/v10/channels/{channel_id}/messages", message_data, header_data)
     response = conn.getresponse()
+def deepseek_query(prompt, context):
+    client = OpenAI(api_key=get_ai_token(), base_url="https://api.deepseek.com")
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": context},
+            {"role": "user", "content": prompt},
+        ],
+        stream=False
+    )
+    return response.choices[0].message.content
 
 def get_most_recent_message(channel_id):
     conn = http.client.HTTPSConnection("discord.com", 443)
@@ -49,9 +72,9 @@ def get_most_recent_message(channel_id):
     response = conn.getresponse()
     if 199 < response.status < 300:
         message = json.loads(response.read().decode())
-        return message[0]['content'], message[0]['author']['username']
+        return message[0]['content']
     else:
-        return f"Discord aint happy: {response.status} error"
+        return None
 
 def send_file(channel_id, file_path):
     conn = http.client.HTTPSConnection("discord.com", 443)
@@ -143,7 +166,7 @@ repeat_tasks = {}
 async def echo(interaction: discord.Interaction, tosay: str, channel_id: str = None):
     channel_id = interaction.channel.id if not channel_id else int(channel_id)
     await interaction.response.send_message("Echoing", ephemeral=True)
-    send_message(channel_id, tosay)
+    send_user_message(channel_id, tosay)
 
 @bot.tree.command(name="test", description="Is bot alive?")
 async def test(interaction: discord.Interaction):
@@ -153,71 +176,64 @@ async def test(interaction: discord.Interaction):
 async def maze(interaction: discord.Interaction, size: int, channel_id: str = None):
     channel_id = interaction.channel.id if not channel_id else int(channel_id)
     await interaction.response.send_message("Generating maze", ephemeral=True)
-    send_message(channel_id, f"-maze {size}")
+    send_user_message(channel_id, f"-maze {size}")
     await asyncio.to_thread(os.system, f"./maze {size} maze.png")
     send_file(channel_id, "./maze.png")
 
 @bot.tree.command(name="repeat", description="Repeat a message in a channel at a specified interval")
-async def repeat(interaction: discord.Interaction, interval: float, message: str, channel: str = None):
+async def repeat(interaction: discord.Interaction, interval: float, message: str):
     try:
         channel_id = interaction.channel.id
-        task_id = random.randint(1000, 9999)
-        while task_id in repeat_tasks:
-            task_id = random.randint(1000, 9999)
+        if channel_id in repeat_tasks:
+            repeat_tasks[channel_id].cancel()
 
         up_pattern = re.compile(r"<up(\d+)>")
         down_pattern = re.compile(r"<down(\d+)>")
         second_pattern = re.compile(r"<second>")
 
-        up_match = up_pattern.search(message)
-        down_match = down_pattern.search(message)
-        second_match = second_pattern.search(message)
-
-        up_counter = int(up_match.group(1)) if up_match else None
-        down_counter = int(down_match.group(1)) if down_match else None
-        second_counter = 1 if second_match else None
+        up_counter = int(up_pattern.search(message).group(1)) if up_pattern.search(message) else None
+        down_counter = int(down_pattern.search(message).group(1)) if down_pattern.search(message) else None
+        second_counter = 1 if second_pattern.search(message) else None
 
         async def repeat_task():
             nonlocal up_counter, down_counter, second_counter
             while True:
                 updated_message = message
-                if up_match:
+                if up_counter is not None:
                     updated_message = up_pattern.sub(str(up_counter), updated_message)
                     up_counter += 1
-                if down_match:
+                if down_counter is not None:
                     updated_message = down_pattern.sub(str(down_counter), updated_message)
                     down_counter -= 1
                     if down_counter < 0:
-                        del repeat_tasks[task_id]
                         break
-                if second_match:
+                if second_counter is not None:
                     updated_message = second_pattern.sub(str(second_counter), updated_message)
                     second_counter += interval
                     if str(second_counter).endswith(".0"):
                         second_counter = int(second_counter)
 
-                send_message(channel_id, updated_message)
+                send_user_message(channel_id, updated_message)
                 await asyncio.sleep(interval)
 
         task = asyncio.create_task(repeat_task())
-        repeat_tasks[task_id] = (task, channel_id)
+        repeat_tasks[channel_id] = task
 
-        await interaction.response.send_message(f"Started repeat: {task_id}", ephemeral=True)
+        await interaction.response.send_message("Started repeat in this channel.", ephemeral=True)
 
     except Exception as e:
         await interaction.response.send_message(f"Failed to start repeating task: {e}", ephemeral=True)
 
-@bot.tree.command(name="stop-repeat", description="Stop a repeating task by its ID")
-async def stop_repeat(interaction: discord.Interaction, id: int):
+@bot.tree.command(name="stop-repeat", description="Stop the repeating task in this channel")
+async def stop_repeat(interaction: discord.Interaction):
     try:
-        if id in repeat_tasks:
-            task, channel_id = repeat_tasks[id]
-            task.cancel()
-            del repeat_tasks[id]
-
-            await interaction.response.send_message(f"Stopped repeating task with ID: {id}", ephemeral=True)
+        channel_id = interaction.channel.id
+        if channel_id in repeat_tasks:
+            repeat_tasks[channel_id].cancel()
+            del repeat_tasks[channel_id]
+            await interaction.response.send_message("Stopped repeat in this channel.", ephemeral=True)
         else:
-            await interaction.response.send_message(f"No repeating task found with ID: {id}", ephemeral=True)
+            await interaction.response.send_message("No repeat task running in this channel.", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"Failed to stop repeating task: {e}", ephemeral=True)
 
@@ -235,7 +251,7 @@ async def daily_maze(interaction: discord.Interaction, size: int, hour: int, min
                 now = datetime.now()
                 if now.hour == hour and now.minute == minute:
                     await asyncio.to_thread(os.system, f"./maze {size} maze.png")
-                    send_message(channel_id, f"daily maze #{i}")
+                    send_user_message(channel_id, f"daily maze #{i}")
                     send_file(channel_id, "./maze.png")
                     i += 1
                 await asyncio.sleep(60)
@@ -441,6 +457,19 @@ async def hidetext(interaction: discord.Interaction, showntext: str, hidetext: s
         f"```{showntext}  {spoiler} _ _ _ _ _ _  {hidetext}```",
         ephemeral=True
     )
+
+@bot.tree.command(name="ai_tilley", description="make tilley an ai")
+async def ai_tilley(interaction: discord.Interaction):
+    context = "You are tilley8, a discord user. You like cats and Linux. Respond to this prompt very concisely, only 20 words or less. do not include emojis and be relatively serious"
+    prompt = get_most_recent_message(interaction.channel.id)
+    await interaction.response.send_message(f"generating message with prompt: {prompt}", ephemeral=True)
+    send_user_message(interaction.channel.id, deepseek_query(prompt, context))
+
+@bot.tree.command(name="deepseek", description="get response from deepseek")
+async def deepseek(interaction: discord.Interaction, prompt: str):
+    await interaction.response.send_message(prompt)
+    await interaction.followup.send(deepseek_query(prompt, "You are a discord bot called Tilley Bot who answers questions in a discord server. do not include emojis and be relatively serious"))
+
 @bot.event
 async def on_ready():
     await bot.tree.sync()
