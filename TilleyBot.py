@@ -362,7 +362,7 @@ async def senakot_time(interaction):
     utc_now = datetime.utcnow()
     sena_time = utc_now + sena_offset
     sena_time = sena_time.strftime("%H:%M")
-    await interaction.response.send_message(f"Senakot's current time is {formatted_time}.")
+    await interaction.response.send_message(f"Senakot's current time is {sena_time}.")
 
 
 
