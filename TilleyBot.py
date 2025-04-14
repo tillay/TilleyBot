@@ -298,10 +298,10 @@ async def timezones(interaction: discord.Interaction, their_time: int = None, yo
         offset = (their_time - your_time) % 24
         if offset > 12:
             offset -= 24
-        offset_total = offset + user_gmt_offset
+        offset_total = offset - user_gmt_offset
         gmt_sign = "+" if offset_total > 0 else ""
         mdt_sign = "+" if offset > 0 else ""
-        timezone_name = get_timezone_name((offset+12) % 12)
+        timezone_name = get_timezone_name((offset_total) % 12)
         await interaction.response.send_message(
             f"GMT{gmt_sign}{offset_total}, MDT{mdt_sign}{offset}, {timezone_name}",
             ephemeral=True
