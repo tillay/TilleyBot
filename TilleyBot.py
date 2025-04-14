@@ -361,20 +361,8 @@ async def senakot_time(interaction):
     sena_offset = timedelta(hours=4)
     utc_now = datetime.utcnow()
     sena_time = utc_now + sena_offset
-    hours = int(sena_time.strftime("%H"))+1
-    minutes = sena_time.strftime("%M")
-    formatted_time = f"{hours}:{minutes}"
-
-    target_time_utc = sena_time.replace(hour=5, minute=0, second=0, microsecond=0)
-    target_time_utc = target_time_utc - timedelta(hours=4)
-    wake_up_timestamp = int(target_time_utc.timestamp())
-
-    if hours < 8 or hours > 10:
-        senakot_status = f"Senakot is probably asleep. He will probably wake up around <t:{wake_up_timestamp}>."
-    else:
-        senakot_status = "He is probably awake but busy right now."
-
-    await interaction.response.send_message(f"Senakot's current time is {formatted_time} UTC+4.\n{senakot_status}")
+    sena_time = sena_time.strftime("%H:%M")
+    await interaction.response.send_message(f"Senakot's current time is {formatted_time}.")
 
 
 
