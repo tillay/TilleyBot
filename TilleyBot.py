@@ -259,7 +259,7 @@ async def catgirl(interaction: discord.Interaction):
 async def diddy(interaction: discord.Interaction):
     await interaction.response.send_message("https://www.lafocusnews.com/wp-content/uploads/2023/08/Diddy-681x1024.jpg", ephemeral=False)
 
-def get_timezone_name(offset):
+def get_timezone_name(offset, dst):
     gmt_offset_names = [
         (-12, "International Date Line West (IDLW)"),
         (-11, "Niue Time (NUT)"),
@@ -287,9 +287,9 @@ def get_timezone_name(offset):
         (11, "Solomon Islands Time (SBT)"),
         (12, "New Zealand Standard Time (NZST)")
     ]
-    for gmt_offset, name in gmt_offset_names:
-        if gmt_offset == offset:
-            return name
+    for offset_name in gmt_offset_names:
+        if offset_name[0] == offset:
+            return offset_name[1]
 
 @bot.tree.command(name="timezones", description="calculate timezones")
 async def timezones(interaction: discord.Interaction, their_time: int = None, your_time: int = None, offset: int = None):
@@ -298,10 +298,10 @@ async def timezones(interaction: discord.Interaction, their_time: int = None, yo
         offset = (their_time - your_time) % 24
         if offset > 12:
             offset -= 24
-        offset_total = offset - user_gmt_offset
+        offset_total = offset + user_gmt_offset
         gmt_sign = "+" if offset_total > 0 else ""
         mdt_sign = "+" if offset > 0 else ""
-        timezone_name = get_timezone_name((offset_total) % 12)
+        timezone_name = get_timezone_name(offset_total)
         await interaction.response.send_message(
             f"GMT{gmt_sign}{offset_total}, MDT{mdt_sign}{offset}, {timezone_name}",
             ephemeral=True
