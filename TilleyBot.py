@@ -169,11 +169,6 @@ def execute_command(cmd):
     except Exception as e:
         return f"An error occurred: {str(e)}"
 
-def generate_task_id():
-    return random.randint(1000, 9999)
-
-repeat_tasks = {}
-
 @bot.tree.command(name="echo", description="Send a message as tillay8")
 async def echo(interaction: discord.Interaction, tosay: str, channel_id: str = None):
     channel_id = interaction.channel.id if not channel_id else int(channel_id)
@@ -191,63 +186,6 @@ async def maze(interaction: discord.Interaction, size: int, channel_id: str = No
     send_user_message(channel_id, f"-maze {size}")
     await asyncio.to_thread(os.system, f"./maze {size} maze.png")
     send_file(channel_id, "./maze.png")
-
-@bot.tree.command(name="repeat", description="Repeat a message in a channel at a specified interval")
-async def repeat(interaction: discord.Interaction, interval: float, message: str):
-    try:
-        channel_id = interaction.channel.id
-        if channel_id in repeat_tasks:
-            repeat_tasks[channel_id].cancel()
-
-        up_pattern = re.compile(r"<up(\d+)>")
-        down_pattern = re.compile(r"<down(\d+)>")
-        second_pattern = re.compile(r"<second>")
-
-        up_counter = int(up_pattern.search(message).group(1)) if up_pattern.search(message) else None
-        down_counter = int(down_pattern.search(message).group(1)) if down_pattern.search(message) else None
-        second_counter = 1 if second_pattern.search(message) else None
-
-        async def repeat_task():
-            nonlocal up_counter, down_counter, second_counter
-            while True:
-                updated_message = message
-                if up_counter is not None:
-                    updated_message = up_pattern.sub(str(up_counter), updated_message)
-                    up_counter += 1
-                if down_counter is not None:
-                    updated_message = down_pattern.sub(str(down_counter), updated_message)
-                    down_counter -= 1
-                    if down_counter < 0:
-                        break
-                if second_counter is not None:
-                    updated_message = second_pattern.sub(str(second_counter), updated_message)
-                    second_counter += interval
-                    if str(second_counter).endswith(".0"):
-                        second_counter = int(second_counter)
-
-                send_user_message(channel_id, updated_message)
-                await asyncio.sleep(interval)
-
-        task = asyncio.create_task(repeat_task())
-        repeat_tasks[channel_id] = task
-
-        await interaction.response.send_message("Started repeat in this channel.", ephemeral=True)
-
-    except Exception as e:
-        await interaction.response.send_message(f"Failed to start repeating task: {e}", ephemeral=True)
-
-@bot.tree.command(name="stop-repeat", description="Stop the repeating task in this channel")
-async def stop_repeat(interaction: discord.Interaction):
-    try:
-        channel_id = interaction.channel.id
-        if channel_id in repeat_tasks:
-            repeat_tasks[channel_id].cancel()
-            del repeat_tasks[channel_id]
-            await interaction.response.send_message("Stopped repeat in this channel.", ephemeral=True)
-        else:
-            await interaction.response.send_message("No repeat task running in this channel.", ephemeral=True)
-    except Exception as e:
-        await interaction.response.send_message(f"Failed to stop repeating task: {e}", ephemeral=True)
 
 @bot.tree.command(name="daily-maze", description="Send a daily maze at a specific time")
 async def daily_maze(interaction: discord.Interaction, size: int, hour: int, minute: int, startnum: int):
@@ -294,10 +232,6 @@ async def encrypt(interaction: discord.Interaction, message: str):
 @bot.tree.command(name="decrypt", description="decrypt a message using server password")
 async def decrypt(interaction: discord.Interaction, encrypted: str):
     await interaction.response.send_message(tdcrypt(encrypted[2:], get_passwd()), ephemeral=True)
-
-@bot.tree.command(name="runcommand", description="Run a command in the terminal and get the output")
-async def runcommand(interaction: discord.Interaction, command: str):
-    await interaction.response.send_message(execute_command(command), ephemeral=True)
 
 @bot.tree.command(name="scramble", description="scramble text")
 async def scramble(interaction: discord.Interaction, message: str):
@@ -367,7 +301,7 @@ async def timezones(interaction: discord.Interaction, their_time: int = None, yo
         offset_total = offset + user_gmt_offset
         gmt_sign = "+" if offset_total > 0 else ""
         mdt_sign = "+" if offset > 0 else ""
-        timezone_name = get_timezone_name(offset_total % 12)
+        timezone_name = get_timezone_name(offset % 12)
         await interaction.response.send_message(
             f"GMT{gmt_sign}{offset_total}, MDT{mdt_sign}{offset}, {timezone_name}",
             ephemeral=True
@@ -425,21 +359,6 @@ async def bots(interaction: discord.Interaction, kill: int = 0):
         await interaction.response.send_message(execute_command(f"kill {kill}"), ephemeral=True)
     else:
         await interaction.response.send_message(execute_command("ps aux | grep python3 | head -n -2 | awk '{print $2, $12, $13, $14}'"), ephemeral=True)
-
-@bot.tree.command(name="info", description="display info about the bot")
-async def info(interaction: discord.Interaction):
-    await interaction.response.send_message(
-    "I am tilley bot! FAQ:\n\n"
-    "What do I do?\n"
-    "- I'm a general purpose utility bot\n"
-    "Can everyone use me?\n"
-    "- No. This is a private bot only tilley can use.\n"
-    "- However, source code is [public](<https://github.com/tillay8/TilleyBot>)\n"
-    "Do I violate TOS?\n"
-    "- no comment\n"
-    "Who is my profile picture?\n"
-    "- [anzu](<https://gup.fandom.com/wiki/Anzu_Kadotani>) from girls und panzer\n"
-    )
     
 @bot.tree.command(name="password", description="set password for encryption")
 async def password(interaction: discord.Interaction, password: str):
