@@ -234,7 +234,7 @@ async def catgirl(interaction: discord.Interaction):
 async def diddy(interaction: discord.Interaction):
     await interaction.response.send_message("https://www.lafocusnews.com/wp-content/uploads/2023/08/Diddy-681x1024.jpg", ephemeral=False)
 
-def get_timezone_name(offset, dst):
+def get_timezone_name(offset):
     gmt_offset_names = [
         (-12, "International Date Line West (IDLW)"),
         (-11, "Niue Time (NUT)"),
