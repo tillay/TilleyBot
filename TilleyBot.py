@@ -12,7 +12,7 @@ except ModuleNotFoundError:
     from Crypto.Util.Padding import pad, unpad
     from Crypto.Cipher import AES
 
-user_gmt_offset = -6
+user_gmt_offset = -7
 bot_token_file = "~/bot_tokens/TilleyBot.token"
 user_token_file = "~/bot_tokens/tillay8.token"
 ai_token_file = "~/bot_tokens/deepseek.token"
@@ -187,31 +187,6 @@ async def maze(interaction: discord.Interaction, size: int, channel_id: str = No
     await asyncio.to_thread(os.system, f"./maze {size} maze.png")
     send_file(channel_id, "./maze.png")
 
-@bot.tree.command(name="daily-maze", description="Send a daily maze at a specific time")
-async def daily_maze(interaction: discord.Interaction, size: int, hour: int, minute: int, startnum: int):
-    try:
-        channel_id = interaction.channel.id
-        task_id = generate_task_id()
-        while task_id in repeat_tasks:
-            task_id = generate_task_id()
-
-        async def repeat_task():
-            i = startnum
-            while True:
-                now = datetime.now()
-                if now.hour == hour and now.minute == minute:
-                    await asyncio.to_thread(os.system, f"./maze {size} maze.png")
-                    send_user_message(channel_id, f"daily maze #{i}")
-                    send_file(channel_id, "./maze.png")
-                    i += 1
-                await asyncio.sleep(60)
-
-        task = asyncio.create_task(repeat_task())
-        repeat_tasks[task_id] = (task, channel_id)
-        await interaction.response.send_message(f"Started daily maze: {task_id}", ephemeral=True)
-    except Exception as e:
-        await interaction.response.send_message(f"Failed to start daily maze: {e}", ephemeral=True)
-
 @bot.tree.command(name="pfp", description="Send pfp of a user")
 async def pfp(interaction: discord.Interaction, user: str):
     try:
@@ -380,6 +355,28 @@ async def date(interaction: discord.Interaction, month: int = None, day: int = N
         await interaction.response.send_message(f"{fancy_date}```{fancy_date}```", ephemeral=True)
     except ValueError:
         await interaction.response.send_message("invalid data", ephemeral=True)
+
+@bot.tree.command(name="senakot_time", description="print info about senakot's time")
+async def senakot_time(interaction):
+    sena_offset = timedelta(hours=4)
+    utc_now = datetime.utcnow()
+    sena_time = utc_now + sena_offset
+    hours = int(sena_time.strftime("%H"))
+    minutes = sena_time.strftime("%M")
+    formatted_time = f"{hours}:{minutes}"
+
+    target_time_utc_plus_4 = sena_time.replace(hour=8, minute=0, second=0, microsecond=0)
+    target_time_utc = target_time_utc_plus_4 - timedelta(hours=4)
+    wake_up_timestamp = int(target_time_utc.timestamp())
+
+    if hours < 8 or hours > 10:
+        senakot_status = f"Senakot is probably asleep. He will probably wake up around <t:{wake_up_timestamp}>."
+    else:
+        senakot_status = "He is probably awake but busy right now."
+
+    await interaction.response.send_message(f"Senakot's current time is {formatted_time} UTC+4.\n{senakot_status}")
+
+
 
 @bot.tree.command(name="hidetext", description="hide text behind other text")
 async def hidetext(interaction: discord.Interaction, showntext: str, hidetext: str):
