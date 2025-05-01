@@ -103,16 +103,12 @@ def translator(inp, to):
     except Exception as e:
         return "Translation failed"
 
-def execute_command(cmd):
-    try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        if result.returncode == 0:
-            output = result.stdout
-        else:
-            output = result.stderr
-        return f"```ansi\n{output}\n```"
-    except Exception as e:
-        return f"An error occurred: {str(e)}"
+def current_time(gmt_offset):
+        offset = timedelta(hours=gmt_offset)
+        utc_now = datetime.utcnow()
+        time = utc_now + offset
+        time = time.strftime("%H:%M (%I:%M %p)")
+        return time
 
 @bot.tree.command(name="repeat", description="repeat previous message")
 async def repeat(interaction: discord.Interaction):
@@ -247,11 +243,11 @@ async def date(interaction: discord.Interaction, month: int = None, day: int = N
 
 @bot.tree.command(name="senakot_time", description="print info about senakot's time")
 async def senakot_time(interaction):
-    sena_offset = timedelta(hours=4)
-    utc_now = datetime.utcnow()
-    sena_time = utc_now + sena_offset
-    sena_time = sena_time.strftime("%H:%M (%I:%M %p)")
-    await interaction.response.send_message(f"Senakot's current time is {sena_time}. He lives in UTC+4.")
+    await interaction.response.send_message(f"Senakot's current time is {get_current_time(4)}. He lives in UTC+4.")
+
+@bot.tree.command(name="kea_time", description="print info about doctorkea's time")
+async def senakot_time(interaction):
+    await interaction.response.send_message(f"Doctorkea's current time is {get_current_time(12)}. He lives in UTC+12.")
 
 @bot.tree.command(name="hidetext", description="hide text behind other text")
 async def hidetext(interaction: discord.Interaction, showntext: str, hidetext: str):
