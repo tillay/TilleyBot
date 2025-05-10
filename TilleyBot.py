@@ -248,6 +248,10 @@ async def senakot_time(interaction):
 @bot.tree.command(name="kea_time", description="print info about doctorkea's time")
 async def senakot_time(interaction):
     await interaction.response.send_message(f"Doctorkea's current time is {get_current_time(12)}. He lives in UTC+12.")
+    
+@bot.tree.command(name="neria_time", description="print info about neria's time")
+async def neria_time(interaction):
+    await interaction.response.send_message(f"Neria's current time is {get_current_time(3)}. He lives in UTC+3.")
 
 @bot.tree.command(name="hidetext", description="hide text behind other text")
 async def hidetext(interaction: discord.Interaction, showntext: str, hidetext: str):
