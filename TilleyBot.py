@@ -103,7 +103,7 @@ def translator(inp, to):
     except Exception as e:
         return "Translation failed"
 
-def current_time(gmt_offset):
+def get_current_time(gmt_offset):
         offset = timedelta(hours=gmt_offset)
         utc_now = datetime.utcnow()
         time = utc_now + offset
