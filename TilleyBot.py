@@ -35,7 +35,7 @@ header_data = {
 }
 
 client = OpenAI(api_key=get_ai_token(), base_url="https://api.deepseek.com")
-dothing = ""
+global dothing = ""
 
 def send_user_message(channel_id, message_content):
     conn = http.client.HTTPSConnection("discord.com", 443)
@@ -147,7 +147,7 @@ async def translate(interaction: discord.Interaction, message: str, lang: str = 
 @bot.tree.command(name="dothething", description="send custom text in next command")
 async def translate(interaction: discord.Interaction, message: str = None):
     if message:
-        dothing = message
+        global dothing = message
         await interaction.response.send_message(f"Set next instance to {dothing}", ephemeral=True)
     else:
         if dothing:
