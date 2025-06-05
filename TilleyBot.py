@@ -1,5 +1,5 @@
-import discord, random, os, re, requests, subprocess, http, json, csv, time
-from datetime import datetime, timedelta
+import discord, os, re, requests, http, json, csv, time
+from datetime import datetime, timedelta, timezone
 from discord.ext import commands
 from html import unescape
 from openai import OpenAI
@@ -105,7 +105,7 @@ def translator(inp, to):
 
 def get_current_time(gmt_offset):
         offset = timedelta(hours=gmt_offset)
-        utc_now = datetime.utcnow()
+        utc_now = datetime.now(timezone.utc)
         time = utc_now + offset
         time = time.strftime("%H:%M (%I:%M %p)")
         return time
@@ -147,47 +147,14 @@ async def translate(interaction: discord.Interaction, message: str, lang: str = 
 async def catgirl(interaction: discord.Interaction):
     await interaction.response.send_message(get_catgirl_link(), ephemeral=False)
 
-def get_timezone_name(offset):
-    gmt_offset_names = [
-        (-12, "International Date Line West (IDLW)"),
-        (-11, "Niue Time (NUT)"),
-        (-10, "Hawaii Time (HAT)"),
-        (-9, "Alaska Time (AKT)"),
-        (-8, "Pacific Time (PT)"),
-        (-7, "Mountain Time (MT)"),
-        (-6, "Central Time (CT)"),
-        (-5, "Eastern Time (ET)"),
-        (-4, "Atlantic Time (AT)"),
-        (-3, "Argentina Time (ART)"),
-        (-2, "South Georgia Time (SGT)"),
-        (-1, "Azores Time (AZOT)"),
-        (0, "Greenwich Mean Time (GMT)"),
-        (1, "Central European Time (CET)"),
-        (2, "Eastern European Time (EET)"),
-        (3, "Moscow Time (MSK)"),
-        (4, "Gulf Standard Time (GST)"),
-        (5, "Kazakhstan Standard Time (PKT)"),
-        (6, "Bangladesh Time (BST)"),
-        (7, "Indochina Time (ICT)"),
-        (8, "China Standard Time (CST)"),
-        (9, "Japan Standard Time (JST)"),
-        (10, "Australian Time (AET)"),
-        (11, "Solomon Islands Time (SBT)"),
-        (12, "New Zealand Standard Time (NZST)")
-    ]
-    for offset_name in gmt_offset_names:
-        if offset_name[0] == offset:
-            return offset_name[1]
-
 @bot.tree.command(name="timezones", description="calculate timezones")
 async def timezones(interaction: discord.Interaction, gmt_offset: int = None):
-    if gmt_offset != None:
-        timezone_name = get_timezone_name(gmt_offset)
+    if gmt_offset is not None:
         gmt_offset = timedelta(hours=gmt_offset)
         utc_now = datetime.utcnow()
         their_time = utc_now + gmt_offset
         their_time = their_time.strftime("%I:%M %p")
-        await interaction.response.send_message(f"Their time is {their_time}, ({timezone_name})", ephemeral=True)
+        await interaction.response.send_message(f"Their time is {their_time})", ephemeral=True)
     else:
         await interaction.response.send_message("http://www.hoelaatishetnuprecies.nl/wp-content/uploads/2015/03/world-timezone-large.jpg")
 
@@ -226,21 +193,6 @@ async def downloader(interaction: discord.Interaction, num: int):
         file.writelines(reversed(lines))
     await interaction.followup.send(file=discord.File(filename), ephemeral=True)
 
-@bot.tree.command(name="date", description="make fancy date embed")
-async def date(interaction: discord.Interaction, month: int = None, day: int = None, hour: int = None, minute: int = None):
-    now = datetime.now()
-    target_month = month if month is not None else now.month
-    target_day = day if day is not None else now.day
-    target_hour = hour if hour is not None else now.hour
-    target_minute = minute if minute is not None else now.minute
-    try:
-        target_date = datetime(now.year, target_month, target_day, target_hour, target_minute)
-        unix_time = int(target_date.timestamp())
-        fancy_date = f"<t:{unix_time}:F>"
-        await interaction.response.send_message(f"{fancy_date}```{fancy_date}```", ephemeral=True)
-    except ValueError:
-        await interaction.response.send_message("invalid data", ephemeral=True)
-
 @bot.tree.command(name="senakot_time", description="print info about senakot's time")
 async def senakot_time(interaction):
     await interaction.response.send_message(f"Senakot's current time is {get_current_time(4)}. He lives in UTC+4.")
@@ -275,6 +227,29 @@ async def ghost_ping(interaction: discord.Interaction, message: str, sniper: str
     await interaction.response.send_message("you should feel guilty", ephemeral=True)
     send_and_delete(interaction.channel.id, message, delay)
     if sniper: send_and_delete(interaction.channel.id, sniper)
+
+@bot.tree.command(name="status_paid", description="send fake status paid message until noxbotv2 comes out")
+async def status_paid(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Status changed!",
+        description="Status of your order has changed.",
+        color=0xFFFF00
+    )
+    embed.add_field(name="**Paid**", value="We got your payment. Please be patient and wait for delivery guy to pick you up.", inline=False)
+    await interaction.response.send_message(embed=embed)
+
+last_message = None
+
+@bot.tree.command(name="do_the_thing", description="custom response")
+async def do_the_thing(interaction: discord.Interaction, message: str = None):
+    global last_message
+    if message:
+        last_message = message
+        await interaction.response.send_message(f"next response will be {message}", ephemeral=True)
+    elif last_message:
+        await interaction.response.send_message(last_message)
+    else:
+        await interaction.response.send_message("please specify message", ephemeral=True)
 
 @bot.event
 async def on_ready():
