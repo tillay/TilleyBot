@@ -220,7 +220,7 @@ async def ai_tilley(interaction: discord.Interaction):
 @bot.tree.command(name="deepseek", description="get response from deepseek")
 async def deepseek(interaction: discord.Interaction, prompt: str):
     await interaction.response.send_message(prompt)
-    await interaction.followup.send(deepseek_query(prompt, "You are a discord bot called Tilley Bot who answers questions in a discord server. do not include emojis and be relatively serious"))
+    await interaction.followup.send(deepseek_query(prompt, "You are a discord bot called Tilley Bot who answers questions in a discord server. do not include emojis and be relatively serious. Keep all responses under 1950 characters."))
 
 @bot.tree.command(name="ghost_ping", description="send and delete message fast")
 async def ghost_ping(interaction: discord.Interaction, message: str, sniper: str=None, delay: int = None):
