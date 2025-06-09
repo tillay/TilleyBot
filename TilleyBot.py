@@ -250,7 +250,17 @@ async def do_the_thing(interaction: discord.Interaction, message: str = None):
         await interaction.response.send_message(last_message)
     else:
         await interaction.response.send_message("please specify message", ephemeral=True)
-
+        
+@bot.tree.command(name="tldr", description="tldr a website")
+async def tldr(interaction: discord.Interaction, url: str):
+    r = requests.get(url, timeout=10)
+    if r.status_code != 200:
+        await interaction.response.send_message("Failed to download site", ephemeral=True)
+        return
+    html = r.text[:15000]
+    result = deepseek_query(html + "\n\nExplain this in simple words below 1600 characters", "")
+    await interaction.response.send_message(result)
+    
 @bot.event
 async def on_ready():
     await bot.tree.sync()
