@@ -100,7 +100,7 @@ async def scramble(interaction: discord.Interaction, message: str):
 
 @bot.tree.command(name="translate", description="translate messages")
 async def translate(interaction: discord.Interaction, message: str, lang: str = "en"):
-    await interaction.response.send_message(translator(message, lang), ephemeral=True
+    await interaction.response.send_message(translator(message, lang), ephemeral=True)
 
 @bot.tree.command(name="romanize", description="romanize messages")
 async def romanize(interaction: discord.Interaction, message: str, lang: str = "en"):
