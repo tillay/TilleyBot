@@ -103,7 +103,7 @@ async def translate(interaction: discord.Interaction, message: str, lang: str = 
     await interaction.response.send_message(translator(message, lang), ephemeral=True)
 
 @bot.tree.command(name="romanize", description="romanize messages")
-async def romanize(interaction: discord.Interaction, message: str, lang: str = "en"):
+async def romanize(interaction: discord.Interaction, message: str):
     await interaction.response.send_message(romanizer(message), ephemeral=False)
     
 @bot.tree.command(name="catgirl", description="send a catgirl")
