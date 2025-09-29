@@ -37,19 +37,46 @@ def get_catgirl_link():
 
 def translator(inp, to):
     try:
-        encoded_input = requests.utils.quote(inp.strip())
-        url = f"https://translate.google.com/m?sl=auto&tl={to}&hl=en&q={encoded_input}"
-        response = requests.get(url)
-        match = re.search(r'class="result-container">([^<]*)</div>', response.text)
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            "client": "gtx",
+            "sl": "auto",
+            "tl": to,
+            "dt": "t",
+            "q": inp
+        }
+        r = requests.get(url, params=params)
+        data = r.json()
+        return "".join(chunk[0] for chunk in data[0] if chunk[0])
+    except:
+        return "Failed"
 
-        if match:
-            translated_text = match.group(1)
-            return unescape(translated_text)
-        else:
-            return "Translation failed"
-    except Exception as e:
-        return "Translation failed"
+def romanizer(inp):
+    try:
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            "client": "gtx",
+            "sl": "auto",
+            "tl": "en",
+            "dt": ["t", "rm"],
+            "q": inp
+        }
+        r = requests.get(url, params=params)
+        data = r.json()
 
+        romanized = ""
+        translated = ""
+
+        for chunk in data[0]:
+            if chunk[0]:
+                translated += chunk[0]
+            if len(chunk) > 3 and chunk[3]:
+                romanized += chunk[3]
+
+        return f"{romanized} ({translated})"
+    except:
+        return "Failed"
+        
 def get_current_time(gmt_offset):
         offset = timedelta(hours=gmt_offset)
         utc_now = datetime.now(timezone.utc)
@@ -71,10 +98,14 @@ async def scramble(interaction: discord.Interaction, message: str):
     message = '​'.join(list(message))
     await interaction.response.send_message(message, ephemeral=True)
 
-@bot.tree.command(name="translate", description="translate messages to english")
+@bot.tree.command(name="translate", description="translate messages")
 async def translate(interaction: discord.Interaction, message: str, lang: str = "en"):
-    await interaction.response.send_message(translator(message, lang), ephemeral=True)
-  
+    await interaction.response.send_message(translator(message, lang), ephemeral=True
+
+@bot.tree.command(name="romanize", description="romanize messages")
+async def romanize(interaction: discord.Interaction, message: str, lang: str = "en"):
+    await interaction.response.send_message(romanizer(message), ephemeral=False)
+    
 @bot.tree.command(name="catgirl", description="send a catgirl")
 async def catgirl(interaction: discord.Interaction):
     await interaction.response.send_message(get_catgirl_link(), ephemeral=False)
