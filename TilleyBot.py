@@ -134,6 +134,12 @@ async def hidetext(interaction: discord.Interaction, showntext: str, hidetext: s
     spoiler = "||​" * 400
     await interaction.response.send_message(f"```{showntext}  {spoiler} _ _ _ _ _ _  {hidetext}```", ephemeral=True)
 
+@bot.tree.command(name="umamusume", description="send a horse girl")
+async def umamusume(interaction: discord.Interaction):
+    with open("/home/tilley/umas.txt", 'r') as file:
+        lines = file.readlines()
+    await interaction.response.send_message(random.choice(lines).strip())
+    
 @bot.tree.command(name="deepseek", description="get response from deepseek")
 async def deepseek(interaction: discord.Interaction, prompt: str):
     await interaction.response.send_message(prompt)
