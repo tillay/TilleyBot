@@ -1,4 +1,4 @@
-import discord, os, re, requests, http, json, csv, time
+import discord, os, re, requests, http, json, csv, time, random
 from datetime import datetime, timedelta, timezone
 from discord.ext import commands
 from html import unescape
