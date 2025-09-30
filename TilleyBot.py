@@ -139,6 +139,13 @@ async def umamusume(interaction: discord.Interaction):
     with open("/home/tilley/umas.txt", 'r') as file:
         lines = file.readlines()
     await interaction.response.send_message(random.choice(lines).strip())
+
+@bot.tree.command(name="umacard", description="send a horse girl card")
+async def umacard(interaction: discord.Interaction):
+    with open('/home/tilley/cards.txt', 'r') as file:
+        cards = file.read().strip().split()
+    random_card = random.choice(cards)
+    await interaction.response.send_message(f"https://umamusu.wiki/w/thumb.php?f=Support_Card_{random_card}_Card.png&width=360")
     
 @bot.tree.command(name="deepseek", description="get response from deepseek")
 async def deepseek(interaction: discord.Interaction, prompt: str):
